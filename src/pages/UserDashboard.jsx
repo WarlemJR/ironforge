@@ -88,8 +88,8 @@ export default function UserDashboard({ currentUser, exercises, workouts, onLogo
     ? currentEx.gif_url_female 
     : currentEx?.gif_url_male;
     
-  // Verifica se o arquivo é um vídeo MP4 para usar a tag HTML <video> em vez de <img>
-  const isVideo = mediaUrl && mediaUrl.toLowerCase().includes('.mp4');
+  // Verifica se o arquivo é um vídeo MP4 ou WebM para usar a tag HTML <video>
+  const isVideo = mediaUrl && (mediaUrl.toLowerCase().includes('.mp4') || mediaUrl.toLowerCase().includes('.webm'));
 
   return (
     <div className="min-h-[100dvh] bg-[#121212] text-white font-sans p-4 flex flex-col">
