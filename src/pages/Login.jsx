@@ -119,13 +119,6 @@ export default function Login({ onLogin }) {
           </button>
         </form>
         
-        <button 
-          type="button" 
-          onClick={handleCreateAdmin} 
-          className="w-full mt-6 bg-[#121212] border border-gray-700 text-gray-400 font-bold py-3 rounded-xl hover:text-white hover:border-gray-500 transition-colors"
-        >
-          🛠️ Setup Inicial: Criar Instrutor
-        </button>
       </div>
     </div>
   );
