@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, LogOut, Users, Activity, Plus, ChevronDown, Trash2, Save } from 'lucide-react';
+import { Settings, LogOut, Users, Activity, Plus, ChevronDown, Trash2, Save, Edit2, X } from 'lucide-react';
 import { supabase, supabaseAdminAuth } from '../supabaseClient';
 
 const DIAS_SEMANA = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
@@ -302,58 +302,137 @@ function AdminExercisesTab({ exercises, setExercises }) {
   const [exGifMFile, setExGifMFile] = useState(null);
   const [exGifFFile, setExGifFFile] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState(null);
 
-  const handleAddExercise = async (e) => {
-    e.preventDefault(); if(!exName) return; setLoading(true);
-    let urlM = null, urlF = null;
+  const handleSaveExercise = async (e) => {
+    e.preventDefault();
+    if(!exName) return;
+    setLoading(true);
 
-    if (exGifMFile) {
-      const fileName = `${Date.now()}_m.${exGifMFile.name.split('.').pop()}`;
-      const { error: uploadError } = await supabase.storage.from('gifs').upload(fileName, exGifMFile);
-      if (!uploadError) urlM = supabase.storage.from('gifs').getPublicUrl(fileName).data.publicUrl;
+    // Se estiver editando, mantém a URL antiga como base. Se vier arquivo novo, sobrescreve.
+    let urlM = editingId ? exercises.find(ex => ex.id === editingId)?.gif_url_male : null;
+    let urlF = editingId ? exercises.find(ex => ex.id === editingId)?.gif_url_female : null;
+
+    try {
+      if (exGifMFile) {
+        const fileName = `${Date.now()}_m.${exGifMFile.name.split('.').pop()}`;
+        const { error: uploadError } = await supabase.storage.from('gifs').upload(fileName, exGifMFile);
+        if (uploadError) throw new Error("Erro no upload do vídeo Masculino: " + uploadError.message);
+        urlM = supabase.storage.from('gifs').getPublicUrl(fileName).data.publicUrl;
+      }
+
+      if (exGifFFile) {
+        const fileName = `${Date.now()}_f.${exGifFFile.name.split('.').pop()}`;
+        const { error: uploadError } = await supabase.storage.from('gifs').upload(fileName, exGifFFile);
+        if (uploadError) throw new Error("Erro no upload do vídeo Feminino: " + uploadError.message);
+        urlF = supabase.storage.from('gifs').getPublicUrl(fileName).data.publicUrl;
+      }
+
+      if (editingId) {
+        const { data, error } = await supabase
+          .from('exercises')
+          .update({ name: exName, gif_url_male: urlM, gif_url_female: urlF })
+          .eq('id', editingId)
+          .select()
+          .single();
+        if (error) throw new Error("Erro ao atualizar banco: " + error.message);
+        if (data) setExercises(exercises.map(ex => ex.id === editingId ? data : ex));
+      } else {
+        const { data, error } = await supabase
+          .from('exercises')
+          .insert([{ name: exName, gif_url_male: urlM, gif_url_female: urlF }])
+          .select()
+          .single();
+        if (error) throw new Error("Erro ao salvar no banco: " + error.message);
+        if (data) setExercises([...exercises, data]);
+      }
+
+      setExName(''); setExGifMFile(null); setExGifFFile(null); setEditingId(null);
+      e.target.reset(); 
+    } catch (err) {
+      alert("❌ " + err.message);
+    } finally {
+      setLoading(false);
     }
-    if (exGifFFile) {
-      const fileName = `${Date.now()}_f.${exGifFFile.name.split('.').pop()}`;
-      const { error: uploadError } = await supabase.storage.from('gifs').upload(fileName, exGifFFile);
-      if (!uploadError) urlF = supabase.storage.from('gifs').getPublicUrl(fileName).data.publicUrl;
-    }
+  };
 
-    const { data } = await supabase.from('exercises').insert([{ name: exName, gif_url_male: urlM, gif_url_female: urlF }]).select().single();
-    if (data) setExercises([...exercises, data]);
-    setLoading(false); setExName(''); setExGifMFile(null); setExGifFFile(null); e.target.reset(); 
+  const handleEditClick = (ex) => {
+    setEditingId(ex.id);
+    setExName(ex.name);
+    setExGifMFile(null);
+    setExGifFFile(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setExName('');
+    setExGifMFile(null);
+    setExGifFFile(null);
   };
 
   const deleteExercise = async (id) => {
-    await supabase.from('exercises').delete().eq('id', id);
-    setExercises(exercises.filter(e => e.id !== id));
+    if(window.confirm("Tem certeza que deseja apagar este exercício?")) {
+        await supabase.from('exercises').delete().eq('id', id);
+        setExercises(exercises.filter(e => e.id !== id));
+    }
   };
 
   return (
     <div className="space-y-6">
-      <form onSubmit={handleAddExercise} className="bg-[#1E1E1E] p-6 rounded-xl border border-gray-800 space-y-4">
-        <h3 className="text-xl font-bold text-[#009C0B] mb-4">Adicionar Novo Exercício</h3>
+      <form onSubmit={handleSaveExercise} className="bg-[#1E1E1E] p-6 rounded-xl border border-gray-800 space-y-4">
+        <div className="flex justify-between items-center mb-4">
+           <h3 className="text-xl font-bold text-[#009C0B]">
+             {editingId ? '✏️ Editar Exercício' : 'Adicionar Novo Exercício'}
+           </h3>
+           {editingId && (
+             <button type="button" onClick={cancelEdit} className="text-gray-400 hover:text-white flex items-center gap-1 text-sm bg-[#121212] px-3 py-2 rounded-lg border border-gray-700 transition-colors">
+                <X size={16} /> Cancelar Edição
+             </button>
+           )}
+        </div>
+        
         <input type="text" placeholder="Nome do Exercício" className="w-full bg-[#121212] text-white border border-gray-700 rounded-xl p-3 focus:outline-none focus:border-[#009C0B]" value={exName} onChange={e => setExName(e.target.value)} required />
-        <div className="flex gap-4">
+        
+        <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 bg-[#121212] p-4 rounded-xl border border-gray-700">
-            <label className="block text-sm font-bold text-gray-300 mb-2">GIF (Masculino)</label>
-            <input type="file" className="text-sm text-gray-400" onChange={e => setExGifMFile(e.target.files[0])} />
+            <label className="block text-sm font-bold text-gray-300 mb-2">
+              {editingId ? 'Substituir Vídeo (Masculino)' : 'GIF/Vídeo (Masculino)'}
+            </label>
+            <input type="file" accept="video/mp4, video/webm, image/gif" className="text-sm text-gray-400 w-full" onChange={e => setExGifMFile(e.target.files[0])} />
+            {editingId && !exGifMFile && exercises.find(e=>e.id===editingId)?.gif_url_male && (
+                <p className="text-xs text-[#009C0B] mt-2 font-bold">✓ Vídeo atual será mantido</p>
+            )}
           </div>
           <div className="flex-1 bg-[#121212] p-4 rounded-xl border border-gray-700">
-            <label className="block text-sm font-bold text-gray-300 mb-2">GIF (Feminino)</label>
-            <input type="file" className="text-sm text-gray-400" onChange={e => setExGifFFile(e.target.files[0])} />
+            <label className="block text-sm font-bold text-gray-300 mb-2">
+              {editingId ? 'Substituir Vídeo (Feminino)' : 'GIF/Vídeo (Feminino)'}
+            </label>
+            <input type="file" accept="video/mp4, video/webm, image/gif" className="text-sm text-gray-400 w-full" onChange={e => setExGifFFile(e.target.files[0])} />
+            {editingId && !exGifFFile && exercises.find(e=>e.id===editingId)?.gif_url_female && (
+                <p className="text-xs text-[#009C0B] mt-2 font-bold">✓ Vídeo atual será mantido</p>
+            )}
           </div>
         </div>
-        <button type="submit" disabled={loading} className="w-full bg-[#009C0B] hover:bg-green-600 text-white font-bold px-8 py-3 rounded-xl transition-colors mt-2 disabled:opacity-50">
-          {loading ? 'Salvando...' : 'Salvar Exercício'}
+
+        <button type="submit" disabled={loading} className="w-full bg-[#009C0B] hover:bg-green-600 text-white font-bold px-8 py-4 rounded-xl transition-colors mt-2 disabled:opacity-50 shadow-lg">
+          {loading ? 'Salvando no Banco...' : (editingId ? 'Atualizar Exercício Definitivo' : 'Salvar Novo Exercício')}
         </button>
       </form>
+      
       <div className="bg-[#1E1E1E] p-6 rounded-xl border border-gray-800">
         <h3 className="text-lg font-bold mb-4 text-white">Exercícios Cadastrados ({exercises.length})</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           {exercises.map(ex => (
-            <div key={ex.id} className="flex justify-between items-center bg-[#121212] p-4 rounded-xl border border-gray-700">
-              <span className="font-bold text-white">{ex.name}</span>
-              <button onClick={() => deleteExercise(ex.id)} className="text-gray-500 hover:text-[#9C0100]"><Trash2 size={20} /></button>
+            <div key={ex.id} className="flex justify-between items-center bg-[#121212] p-4 rounded-xl border border-gray-700 group">
+              <div className="flex items-center gap-3">
+                 <div className={`w-3 h-3 rounded-full flex-shrink-0 ${ex.gif_url_male || ex.gif_url_female ? 'bg-[#009C0B] shadow-[0_0_8px_#009C0B]' : 'bg-[#9C0100]'}`} title={ex.gif_url_male || ex.gif_url_female ? 'Possui Mídia' : 'Sem Mídia'}></div>
+                 <span className="font-bold text-white uppercase text-sm md:text-base">{ex.name}</span>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => handleEditClick(ex)} className="text-gray-500 hover:text-[#005A9C] p-2 bg-[#1E1E1E] rounded-lg transition-colors"><Edit2 size={18} /></button>
+                <button onClick={() => deleteExercise(ex.id)} className="text-gray-500 hover:text-[#9C0100] p-2 bg-[#1E1E1E] rounded-lg transition-colors"><Trash2 size={18} /></button>
+              </div>
             </div>
           ))}
         </div>
