@@ -86,7 +86,7 @@ export default function Login({ onLogin }) {
         <div className="flex justify-center mb-6 text-[#009C9A]">
           <Dumbbell size={48} />
         </div>
-        <h1 className="text-2xl font-bold text-center mb-8 tracking-tight text-white">Acesso ao Treino</h1>
+        <h1 className="text-2xl font-bold text-center mb-8 tracking-tight text-white">Iron Forge - Acesso ao Treino</h1>
         {error && <p className="text-[#9C0100] text-sm text-center mb-4 bg-red-900/20 py-2 rounded-lg px-2">{error}</p>}
         
         <form onSubmit={handleLogin} className="space-y-5">
