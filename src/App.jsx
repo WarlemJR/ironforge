@@ -7,13 +7,10 @@ import { supabase } from './supabaseClient';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
-  
-  // Estados para guardar os dados do Supabase
   const [usersMock, setUsersMock] = useState([]); 
   const [exercises, setExercises] = useState([]);
-  const [workouts, setWorkouts] = useState([]);
+  const [workouts, setWorkouts] = useState([]); // Será integrado ao banco no próximo passo
 
-  // Função para buscar dados iniciais após o login
   useEffect(() => {
     if (currentUser) {
       fetchInitialData();
@@ -21,24 +18,19 @@ export default function App() {
   }, [currentUser]);
 
   const fetchInitialData = async () => {
-    // Busca todos os exercícios cadastrados
     const { data: exData } = await supabase.from('exercises').select('*');
     if (exData) setExercises(exData);
 
-    // Se for admin, busca a lista de alunos
     if (currentUser.role === 'admin') {
-      const { data: usersData } = await supabase.from('users').select('*').eq('role', 'aluno');
-      if (usersData) setUsersMock(usersData);
+      // Agora buscamos da tabela segura 'profiles'
+      const { data: profilesData } = await supabase.from('profiles').select('*').eq('role', 'aluno');
+      if (profilesData) setUsersMock(profilesData);
     }
   };
 
-  if (!currentUser) {
-    return <Login onLogin={setCurrentUser} />;
-  }
-
-  if (currentUser.needs_password_change) {
-    return <ChangePassword user={currentUser} onPasswordChanged={setCurrentUser} />;
-  }
+  if (!currentUser) return <Login onLogin={setCurrentUser} />;
+  
+  if (currentUser.needs_password_change) return <ChangePassword user={currentUser} onPasswordChanged={setCurrentUser} />;
 
   return (
     <div className="min-h-screen bg-[#121212] text-white font-sans selection:bg-[#009C9A] selection:text-white">
