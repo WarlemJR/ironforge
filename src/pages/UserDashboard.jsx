@@ -7,6 +7,7 @@ export default function UserDashboard({ currentUser, exercises, workouts, onLogo
   const [queue, setQueue] = useState([]);
   const [todayStr, setTodayStr] = useState('');
   const [isFree, setIsFree] = useState(false);
+  const [isRestDay, setIsRestDay] = useState(false);
 
   useEffect(() => {
     const todayIndex = new Date().getDay();
@@ -17,9 +18,19 @@ export default function UserDashboard({ currentUser, exercises, workouts, onLogo
 
     if (workoutToday) {
       setIsFree(workoutToday.isFreeWorkout);
-      setQueue(workoutToday.items || []);
+      
+      // Se não é treino livre E (não tem itens cadastrados ou a lista está vazia), é dia de descanso
+      if (!workoutToday.isFreeWorkout && (!workoutToday.items || workoutToday.items.length === 0)) {
+        setIsRestDay(true);
+        setQueue([]);
+      } else {
+        setIsRestDay(false);
+        setQueue(workoutToday.items || []);
+      }
     } else {
+      // Se não existe NENHUMA ficha cadastrada para o dia de hoje, automaticamente é descanso
       setIsFree(false);
+      setIsRestDay(true);
       setQueue([]);
     }
   }, [workouts, currentUser]);
@@ -40,7 +51,7 @@ export default function UserDashboard({ currentUser, exercises, workouts, onLogo
 
   if (isFree) {
     return (
-      <div className="min-h-screen bg-[#121212] text-white p-4 flex flex-col items-center justify-center relative">
+      <div className="min-h-[100dvh] bg-[#121212] text-white p-4 flex flex-col items-center justify-center relative">
         <header className="absolute top-4 w-full px-4 flex justify-between items-center">
           <div>
             <p className="text-gray-400 text-sm">Olá, {currentUser.name}</p>
@@ -50,7 +61,7 @@ export default function UserDashboard({ currentUser, exercises, workouts, onLogo
             <LogOut size={20} />
           </button>
         </header>
-        <div className="text-center space-y-4 max-w-sm">
+        <div className="text-center space-y-4 max-w-sm mt-12">
           <span className="text-6xl block mb-4">🔥</span>
           <h2 className="text-2xl font-bold">Hoje o treino é livre!</h2>
           <p className="text-gray-400">Aproveite para focar no que você mais gosta ou fazer um cardio de respeito.</p>
@@ -59,9 +70,30 @@ export default function UserDashboard({ currentUser, exercises, workouts, onLogo
     );
   }
 
+  if (isRestDay) {
+    return (
+      <div className="min-h-[100dvh] bg-[#121212] text-white p-4 flex flex-col items-center justify-center relative">
+        <header className="absolute top-4 w-full px-4 flex justify-between items-center">
+          <div>
+            <p className="text-gray-400 text-sm">Olá, {currentUser.name}</p>
+            <h1 className="text-xl font-bold text-[#897F9C]">Descanso</h1>
+          </div>
+          <button onClick={onLogout} className="p-3 bg-[#1E1E1E] rounded-full text-gray-400 hover:text-[#9C0100] transition-colors">
+            <LogOut size={20} />
+          </button>
+        </header>
+        <div className="text-center space-y-4 max-w-sm mt-12">
+          <span className="text-6xl block mb-4">🔋</span>
+          <h2 className="text-2xl font-bold">Dia de Descanso!</h2>
+          <p className="text-gray-400">Nenhum exercício programado para hoje. Aproveite para recuperar as energias e descansar os músculos.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (queue.length === 0) {
     return (
-      <div className="min-h-screen bg-[#121212] text-white p-4 flex flex-col items-center justify-center relative">
+      <div className="min-h-[100dvh] bg-[#121212] text-white p-4 flex flex-col items-center justify-center relative">
         <header className="absolute top-4 w-full px-4 flex justify-between items-center">
           <div>
             <p className="text-gray-400 text-sm">Olá, {currentUser.name}</p>
@@ -71,7 +103,7 @@ export default function UserDashboard({ currentUser, exercises, workouts, onLogo
             <LogOut size={20} />
           </button>
         </header>
-        <div className="text-center space-y-4 max-w-sm">
+        <div className="text-center space-y-4 max-w-sm mt-12">
           <CheckCircle2 size={64} className="text-[#009C0B] mx-auto mb-4" />
           <h2 className="text-2xl font-bold">Treino Concluído!</h2>
           <p className="text-gray-400">Você finalizou todos os exercícios da ficha de hoje. Excelente trabalho!</p>
@@ -83,12 +115,10 @@ export default function UserDashboard({ currentUser, exercises, workouts, onLogo
   const currentItem = queue[0];
   const currentEx = exercises.find(e => e.id === currentItem.exerciseId);
   
-  // Decide se usa o GIF masculino ou feminino
-  const mediaUrl = currentUser.gender === 'F' && currentEx?.gif_url_female 
-    ? currentEx.gif_url_female 
-    : currentEx?.gif_url_male;
+  const mediaUrl = currentUser.gender === 'F' 
+    ? (currentEx?.gif_url_female || currentEx?.gif_url_male) 
+    : (currentEx?.gif_url_male || currentEx?.gif_url_female);
     
-  // Verifica se o arquivo é um vídeo MP4 ou WebM para usar a tag HTML <video>
   const isVideo = mediaUrl && (mediaUrl.toLowerCase().includes('.mp4') || mediaUrl.toLowerCase().includes('.webm'));
 
   return (
@@ -113,18 +143,10 @@ export default function UserDashboard({ currentUser, exercises, workouts, onLogo
             Faltam: {queue.length}
           </div>
           
-          {/* Renderizador de Mídia (Forçando Autoplay Mudo no Mobile) */}
           <div className="h-[40vh] min-h-[250px] bg-[#0a0a0a] flex items-center justify-center relative overflow-hidden">
             {mediaUrl ? (
               isVideo ? (
-                <video 
-                  src={mediaUrl} 
-                  autoPlay 
-                  loop 
-                  muted 
-                  playsInline 
-                  className="w-full h-full object-cover"
-                />
+                <video src={mediaUrl} autoPlay loop muted playsInline className="w-full h-full object-cover" />
               ) : (
                 <img src={mediaUrl} alt={currentEx?.name} className="w-full h-full object-cover" />
               )
@@ -140,7 +162,6 @@ export default function UserDashboard({ currentUser, exercises, workouts, onLogo
             
             <div className="flex gap-4 mb-8">
               {currentItem.duration ? (
-                // Se existe "TEMPO", exibe TEMPO e oculta "REPS". Só exibe "SÉRIES" se o admin colocou > 0.
                 <>
                   {currentItem.sets > 0 && (
                     <div className="flex-1 bg-[#121212] border border-gray-800 rounded-2xl p-4 flex flex-col items-center justify-center shadow-inner">
@@ -154,7 +175,6 @@ export default function UserDashboard({ currentUser, exercises, workouts, onLogo
                   </div>
                 </>
               ) : (
-                // Padrão: SÉRIES e REPS
                 <>
                   <div className="flex-1 bg-[#121212] border border-gray-800 rounded-2xl p-4 flex flex-col items-center justify-center shadow-inner">
                     <span className="text-gray-500 text-xs font-bold tracking-widest uppercase mb-1">Séries</span>
@@ -169,21 +189,13 @@ export default function UserDashboard({ currentUser, exercises, workouts, onLogo
             </div>
 
             <div className="mt-auto space-y-3">
-              <button 
-                onClick={handleComplete}
-                className="w-full bg-[#005A9C] hover:bg-[#009C9A] text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-blue-900/20"
-              >
-                <CheckCircle2 size={24} />
-                Concluído
+              <button onClick={handleComplete} className="w-full bg-[#005A9C] hover:bg-[#009C9A] text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-blue-900/20">
+                <CheckCircle2 size={24} /> Concluído
               </button>
               
               {queue.length > 1 && (
-                <button 
-                  onClick={handleSkip}
-                  className="w-full bg-[#121212] border border-gray-800 text-gray-400 hover:text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95"
-                >
-                  <SkipForward size={20} />
-                  Pular esse exercício
+                <button onClick={handleSkip} className="w-full bg-[#121212] border border-gray-800 text-gray-400 hover:text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95">
+                  <SkipForward size={20} /> Pular esse exercício
                 </button>
               )}
             </div>
