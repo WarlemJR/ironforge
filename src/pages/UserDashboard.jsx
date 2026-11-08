@@ -6,34 +6,27 @@ const DIAS_SEMANA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'
 export default function UserDashboard({ currentUser, exercises, workouts, onLogout }) {
   const [queue, setQueue] = useState([]);
   const [todayStr, setTodayStr] = useState('');
-  const [isFree, setIsFree] = useState(false);
-  const [isRestDay, setIsRestDay] = useState(false);
 
+  // 1. Descobre qual é o dia de hoje
+  const todayIndex = new Date().getDay();
+  const todayName = DIAS_SEMANA[todayIndex];
+
+  // 2. Busca a ficha de hoje no banco de dados
+  const workoutToday = workouts.find(w => w.studentId === currentUser.id && w.dayOfWeek === todayName);
+
+  // 3. Define as regras inteligentemente (sem atrasos de renderização)
+  const isFree = workoutToday?.isFreeWorkout || false;
+  
+  // É dia de descanso SE: não tem ficha cadastrada OU (não é treino livre E a ficha está vazia)
+  const isRestDay = !workoutToday || (!workoutToday.isFreeWorkout && (!workoutToday.items || workoutToday.items.length === 0));
+
+  // 4. Carrega a fila de exercícios na memória do aluno
   useEffect(() => {
-    const todayIndex = new Date().getDay();
-    const todayName = DIAS_SEMANA[todayIndex];
     setTodayStr(todayName);
-
-    const workoutToday = workouts.find(w => w.studentId === currentUser.id && w.dayOfWeek === todayName);
-
-    if (workoutToday) {
-      setIsFree(workoutToday.isFreeWorkout);
-      
-      // Se não é treino livre E (não tem itens cadastrados ou a lista está vazia), é dia de descanso
-      if (!workoutToday.isFreeWorkout && (!workoutToday.items || workoutToday.items.length === 0)) {
-        setIsRestDay(true);
-        setQueue([]);
-      } else {
-        setIsRestDay(false);
-        setQueue(workoutToday.items || []);
-      }
-    } else {
-      // Se não existe NENHUMA ficha cadastrada para o dia de hoje, automaticamente é descanso
-      setIsFree(false);
-      setIsRestDay(true);
-      setQueue([]);
+    if (workoutToday && !isRestDay && !isFree) {
+      setQueue(workoutToday.items || []);
     }
-  }, [workouts, currentUser]);
+  }, [workoutToday?.id, isRestDay, isFree, todayName]); 
 
   const handleComplete = () => {
     setQueue(prev => prev.slice(1));
@@ -49,6 +42,7 @@ export default function UserDashboard({ currentUser, exercises, workouts, onLogo
     });
   };
 
+  // --- TELA 1: TREINO LIVRE ---
   if (isFree) {
     return (
       <div className="min-h-[100dvh] bg-[#121212] text-white p-4 flex flex-col items-center justify-center relative">
@@ -70,13 +64,14 @@ export default function UserDashboard({ currentUser, exercises, workouts, onLogo
     );
   }
 
+  // --- TELA 2: DIA DE DESCANSO ---
   if (isRestDay) {
     return (
       <div className="min-h-[100dvh] bg-[#121212] text-white p-4 flex flex-col items-center justify-center relative">
         <header className="absolute top-4 w-full px-4 flex justify-between items-center">
           <div>
             <p className="text-gray-400 text-sm">Olá, {currentUser.name}</p>
-            <h1 className="text-xl font-bold text-[#897F9C]">Descanso</h1>
+            <h1 className="text-xl font-bold text-[#005A9C]">Treino de {todayName}</h1>
           </div>
           <button onClick={onLogout} className="p-3 bg-[#1E1E1E] rounded-full text-gray-400 hover:text-[#9C0100] transition-colors">
             <LogOut size={20} />
@@ -84,20 +79,21 @@ export default function UserDashboard({ currentUser, exercises, workouts, onLogo
         </header>
         <div className="text-center space-y-4 max-w-sm mt-12">
           <span className="text-6xl block mb-4">🔋</span>
-          <h2 className="text-2xl font-bold">Dia de Descanso!</h2>
-          <p className="text-gray-400">Nenhum exercício programado para hoje. Aproveite para recuperar as energias e descansar os músculos.</p>
+          <h2 className="text-2xl font-bold">Hoje é dia de descansar o corpo</h2>
+          <p className="text-gray-400">Nenhum exercício programado para hoje. Aproveite para recuperar as energias.</p>
         </div>
       </div>
     );
   }
 
+  // --- TELA 3: TREINO CONCLUÍDO (Havia treino, mas a fila esvaziou) ---
   if (queue.length === 0) {
     return (
       <div className="min-h-[100dvh] bg-[#121212] text-white p-4 flex flex-col items-center justify-center relative">
         <header className="absolute top-4 w-full px-4 flex justify-between items-center">
           <div>
             <p className="text-gray-400 text-sm">Olá, {currentUser.name}</p>
-            <h1 className="text-xl font-bold text-[#005A9C]">Treino de {todayStr}</h1>
+            <h1 className="text-xl font-bold text-[#005A9C]">Treino de {todayName}</h1>
           </div>
           <button onClick={onLogout} className="p-3 bg-[#1E1E1E] rounded-full text-gray-400 hover:text-[#9C0100] transition-colors">
             <LogOut size={20} />
@@ -112,6 +108,7 @@ export default function UserDashboard({ currentUser, exercises, workouts, onLogo
     );
   }
 
+  // --- TELA 4: EXIBIÇÃO DOS EXERCÍCIOS ---
   const currentItem = queue[0];
   const currentEx = exercises.find(e => e.id === currentItem.exerciseId);
   
